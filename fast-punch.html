@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Berht Robotics - Fast Punch</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+  body { background:#f4f6f9; font-family:'Segoe UI', sans-serif; }
+  .app-card { max-width:420px; margin:20px auto; background:#fff; border-radius:15px; box-shadow:0 10px 25px rgba(0,0,0,0.1); padding:20px; }
+  .header { text-align:center; margin-bottom:20px; }
+  .header img { width:70px; height:70px; border-radius:50%; object-fit:cover; }
+  #camBox { width:100%; max-width:280px; height:210px; margin:10px auto; background:#000; border-radius:10px; overflow:hidden; position:relative; }
+  #camBox video { width:100%; height:100%; object-fit:cover; }
+  #camStatus { text-align:center; font-size:0.75rem; color:#999; margin-bottom:10px; min-height:1em; }
+  .btn-tile { height:70px; font-weight:bold; border-radius:12px; font-size:1.1rem; }
+  .hidden { display:none !important; }
+  #custom-modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; display:none; align-items:center; justify-content:center; }
+  .modal-box { background:#fff; padding:25px; border-radius:10px; width:90%; max-width:360px; text-align:center; }
+</style>
+</head>
+<body>
+
+<div class="app-card">
+  <div class="header">
+    <img src="https://lh3.googleusercontent.com/d/1IlEvXIWhLG-zq7aVWp8wFlZMe1i87kD5" alt="Logo">
+    <h4 class="mt-2">Berht Robotics</h4>
+    <p class="text-muted small" id="user-info">Fast Punch</p>
+  </div>
+
+  <!-- LOGIN VIEW -->
+  <div id="view-login">
+    <label class="small fw-bold">Enter your Employee ID</label>
+    <input type="text" id="login-empid" class="form-control mb-2" placeholder="e.g. BRO-001" style="text-transform:uppercase;">
+    <button class="btn btn-dark w-100" onclick="doLogin()">Continue</button>
+    <p class="text-muted small mt-2 text-center">Your ID is remembered on this device - you won't need to enter it again.</p>
+  </div>
+
+  <!-- PUNCH VIEW -->
+  <div id="view-punch" class="hidden text-center">
+    <h5>Attendance</h5>
+
+    <div id="camBox">
+      <video id="video" autoplay playsinline muted></video>
+    </div>
+    <div id="camStatus">Starting camera...</div>
+
+    <div id="out-notes-container" class="mb-3 text-start hidden">
+      <label class="small fw-bold text-danger">Daily Task Summary (Required for OUT)</label>
+      <textarea id="work-notes" class="form-control" rows="3" placeholder="Briefly describe what you worked on today..."></textarea>
+    </div>
+
+    <div class="row g-2">
+      <div class="col-6"><button id="btn-in" class="btn btn-success w-100 btn-tile" onclick="doPunch('IN', this)">IN</button></div>
+      <div class="col-6"><button id="btn-out" class="btn btn-danger w-100 btn-tile" onclick="prepareOut(this)">OUT</button></div>
+    </div>
+
+    <button class="btn btn-link mt-3" onclick="logout()">Switch Employee</button>
+  </div>
+
+  <canvas id="canvas" style="display:none;"></canvas>
+</div>
+
+<div id="custom-modal"><div class="modal-box"><h5 id="modal-title">Title</h5><p id="modal-msg" style="white-space:pre-line;">Message</p><button class="btn btn-primary w-100 mt-2" onclick="document.getElementById('custom-modal').style.display='none'">OK</button></div></div>
+
+<script>
+// ===== SET THIS TO YOUR APPS SCRIPT WEB APP URL =====
+const APPS_SCRIPT_URL = "https://script.google.com/a/macros/berhtrobotics.com/s/AKfycbxKXUwxd9kF648dFJ8XTE8inOKkO8AGVGWaxEFXyg6pvuNAV16LWsRG8C_sVzO0ts0/exec";
+// ======================================================
+
+let curUser = null;
+let camReady = false;
+
+function showModal(t, m) {
+  document.getElementById('modal-title').innerText = t;
+  document.getElementById('modal-msg').innerText = m;
+  document.getElementById('custom-modal').style.display = 'flex';
+}
+
+function callBackend(payload) {
+  // Content-Type text/plain avoids a CORS "preflight" request that Apps Script can't answer.
+  // The server still parses the body as JSON regardless of this header.
+  return fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  }).then(r => r.json());
+}
+
+function initCam() {
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } }).then(stream => {
+    document.getElementById('video').srcObject = stream;
+    camReady = true;
+    document.getElementById('camStatus').innerText = '';
+  }).catch(err => {
+    document.getElementById('camStatus').innerText = 'Camera unavailable: ' + err.name;
+  });
+}
+
+function captureFrame() {
+  const v = document.getElementById('video');
+  if (!v || v.videoWidth === 0) return null;
+  const c = document.getElementById('canvas');
+  const scale = Math.min(1, 360 / v.videoWidth);
+  c.width = v.videoWidth * scale;
+  c.height = v.videoHeight * scale;
+  c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.5);
+}
+
+window.onload = function () {
+  const savedId = localStorage.getItem('bro_empid');
+  if (savedId) {
+    loginWithId(savedId);
+  }
+};
+
+function doLogin() {
+  const id = document.getElementById('login-empid').value.trim().toUpperCase();
+  if (!id) return showModal('Error', 'Please enter your Employee ID.');
+  loginWithId(id);
+}
+
+function loginWithId(id) {
+  callBackend({ action: 'lookupEmployee', empId: id }).then(res => {
+    if (res.success) {
+      curUser = res;
+      localStorage.setItem('bro_empid', id);
+      document.getElementById('user-info').innerText = res.name;
+      document.getElementById('view-login').classList.add('hidden');
+      document.getElementById('view-punch').classList.remove('hidden');
+      if (res.hasIn) document.getElementById('btn-in').disabled = true;
+      if (!res.hasIn || res.hasOut) document.getElementById('btn-out').disabled = true;
+      initCam();
+    } else {
+      localStorage.removeItem('bro_empid');
+      showModal('Login Failed', res.message);
+    }
+  }).catch(err => showModal('Error', 'Could not reach server: ' + err.message));
+}
+
+function logout() {
+  localStorage.removeItem('bro_empid');
+  location.reload();
+}
+
+function prepareOut(btn) {
+  const notesContainer = document.getElementById('out-notes-container');
+  const notesField = document.getElementById('work-notes');
+  if (notesContainer.classList.contains('hidden')) {
+    notesContainer.classList.remove('hidden');
+    notesField.focus();
+    btn.innerText = 'Confirm OUT';
+  } else {
+    if (!notesField.value.trim()) return showModal('Required', 'Please enter your daily task summary before punching out.');
+    doPunch('OUT', btn);
+  }
+}
+
+function doPunch(act, btn) {
+  if (!navigator.geolocation) return showModal('Error', 'Location access required');
+
+  let workNotes = act === 'OUT' ? document.getElementById('work-notes').value.trim() : '';
+  btn.disabled = true;
+  btn.innerText = 'Punching...';
+
+  const imgData = captureFrame(); // instant - the camera has already been running
+
+  navigator.geolocation.getCurrentPosition(pos => {
+    callBackend({
+      action: 'fastPunch',
+      empId: curUser.empId,
+      action_: act,
+      lat: pos.coords.latitude,
+      lon: pos.coords.longitude,
+      photo: imgData,
+      workNotes: workNotes
+    }).then(res => {
+      if (res.success) {
+        showModal('Success', res.message);
+        if (act === 'IN') document.getElementById('btn-in').disabled = true;
+        if (act === 'OUT') document.getElementById('btn-out').disabled = true;
+        document.getElementById('out-notes-container').classList.add('hidden');
+        document.getElementById('work-notes').value = '';
+      } else {
+        showModal('Error', res.message);
+        btn.disabled = false;
+        btn.innerText = act === 'OUT' ? 'Confirm OUT' : act;
+      }
+    }).catch(err => {
+      showModal('Error', 'Could not reach server: ' + err.message);
+      btn.disabled = false;
+      btn.innerText = act === 'OUT' ? 'Confirm OUT' : act;
+    });
+  }, err => {
+    btn.disabled = false;
+    btn.innerText = act === 'OUT' ? 'Confirm OUT' : act;
+    showModal('Location Error', err.message);
+  }, { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 });
+}
+</script>
+</body>
+</html>
