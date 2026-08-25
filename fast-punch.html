@@ -29,6 +29,7 @@
   .cal-day.red { background-color:#e74c3c; }
   .cal-day.yellow { background-color:#f1c40f; color:#333; }
   .cal-day.grey { background-color:#dfe6e9; color:#b2bec3; cursor:default; }
+  .cal-day.half { background-color:#e67e22; }
 </style>
 </head>
 <body>
@@ -94,7 +95,7 @@
     <h5 class="text-center" id="cal-month-name">--</h5>
     <div class="cal-header"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
     <div class="calendar-grid" id="cal-grid"></div>
-    <div class="mt-3 small text-center text-muted"><span class="badge bg-success">■</span> Present <span class="badge bg-danger">■</span> Absent <span class="badge bg-warning text-dark">■</span> Sun</div>
+    <div class="mt-3 small text-center text-muted"><span class="badge bg-success">■</span> Present <span class="badge bg-danger">■</span> Absent <span class="badge" style="background-color:#e67e22;">■</span> Half Day <span class="badge bg-warning text-dark">■</span> Sun</div>
     <button class="btn btn-link w-100 mt-3" onclick="showHome()">Back</button>
   </div>
 
@@ -452,9 +453,10 @@ function loadCalendar() {
       } else {
         div.className = `cal-day ${d.status.toLowerCase()}`;
         div.innerText = d.day;
-        if (d.status === 'GREEN' || d.status === 'RED') {
+        if (d.status === 'GREEN' || d.status === 'RED' || d.status === 'HALF') {
           div.onclick = () => {
-            document.getElementById('mod-content').innerHTML = `<strong>Date:</strong> ${d.day}-${cal.monthStr}<br><strong>In:</strong> ${d.inTime}<br><strong>Out:</strong> ${d.outTime}`;
+            const halfNote = d.status === 'HALF' ? '<br><strong style="color:#e67e22;">Half Day</strong> (less than 5 hrs between IN &amp; OUT)' : '';
+            document.getElementById('mod-content').innerHTML = `<strong>Date:</strong> ${d.day}-${cal.monthStr}<br><strong>In:</strong> ${d.inTime}<br><strong>Out:</strong> ${d.outTime}${halfNote}`;
             document.getElementById('detail-modal').style.display = 'flex';
           };
         }
@@ -469,6 +471,7 @@ function loadCalendar() {
 function subLeave(btn) {
   const s = document.getElementById('ls').value, e = document.getElementById('le').value, r = document.getElementById('lr').value;
   if (!s || !e || !r) return showModal('Error', 'Fill all fields.');
+  if (new Date(e) < new Date(s)) return showModal('Error', 'End Date cannot be before Start Date.');
   btn.disabled = true;
   callBackend('submitLeave', { empName: curUser.name, dept: curUser.dept, start: s, end: e, reason: r, email: curUser.email }).then(res => {
     btn.disabled = false;
