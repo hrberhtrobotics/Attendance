@@ -59,9 +59,9 @@
         <hr><h6 class="text-muted text-center">Admin Controls</h6>
         <button class="btn btn-success w-100 mb-2" onclick="loadApprovals()">✅ Approve Leaves</button>
         <button class="btn btn-secondary w-100 mb-2" onclick="loadManualPunch()">🛠️ Manual Punch</button>
+        <button class="btn btn-dark w-100 mb-2 hidden" id="enroll-btn" onclick="showView('view-enroll')">➕ Enroll Employee</button>
       </div>
       <div class="col-12 hidden" id="super-panel">
-        <button class="btn btn-dark w-100 mb-2" onclick="showView('view-enroll')">➕ Enroll Employee</button>
         <button class="btn btn-primary w-100 mb-2" onclick="showView('view-manage-loc')">📍 Manage Locations</button>
         <button class="btn btn-warning w-100 mb-2" onclick="loadGeofenceManager()">🗺️ Assign Geofence</button>
         <button class="btn btn-danger w-100 mb-2" onclick="loadStatusManager()">🚫 Manage Status</button>
@@ -334,8 +334,13 @@ function enterDashboard(res) {
 
   document.getElementById('admin-panel').classList.add('hidden');
   document.getElementById('super-panel').classList.add('hidden');
+  document.getElementById('enroll-btn').classList.add('hidden');
   if (res.role === 'Admin' || res.role === 'SuperAdmin') document.getElementById('admin-panel').classList.remove('hidden');
   if (res.role === 'SuperAdmin') { document.getElementById('super-panel').classList.remove('hidden'); populateReportDropdown(); }
+  // Enroll Employee: only SuperAdmin, or an Admin whose own department is "Admin" (HR/Admin function).
+  if (res.role === 'SuperAdmin' || (res.role === 'Admin' && res.dept === 'Admin')) {
+    document.getElementById('enroll-btn').classList.remove('hidden');
+  }
 
   document.getElementById('btn-in').disabled = !!res.hasIn;
   document.getElementById('btn-out').disabled = !res.hasIn || !!res.hasOut;
