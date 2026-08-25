@@ -64,6 +64,7 @@
         <button class="btn btn-primary w-100 mb-2" onclick="showView('view-manage-loc')">📍 Manage Locations</button>
         <button class="btn btn-warning w-100 mb-2" onclick="loadGeofenceManager()">🗺️ Assign Geofence</button>
         <button class="btn btn-danger w-100 mb-2" onclick="loadStatusManager()">🚫 Manage Status</button>
+        <button class="btn btn-outline-dark w-100 mb-2" onclick="loadDeviceManager()">📱 Manage Devices</button>
         <div class="input-group mb-2"><select id="report-month" class="form-select"></select><button class="btn btn-info text-white" onclick="genReport(this)">📊 PDF Report</button></div>
       </div>
     </div>
@@ -237,6 +238,14 @@
     <button class="btn btn-link w-100 mt-3" onclick="showHome()">Back</button>
   </div>
 
+  <!-- MANAGE DEVICES VIEW -->
+  <div id="view-devices" class="hidden">
+    <h5 class="text-center mb-3">Device Manager</h5>
+    <p class="text-muted small text-center">Each engineer is locked to the first device they log in from. Reset here to let them log in from a new device.</p>
+    <div id="device-list"></div>
+    <button class="btn btn-link w-100 mt-3" onclick="showHome()">Back</button>
+  </div>
+
   <canvas id="canvas" style="display:none;"></canvas>
 </div>
 
@@ -256,10 +265,23 @@ function showModal(t, m) {
   document.getElementById('custom-modal').style.display = 'flex';
 }
 
+// Identifies THIS browser/phone so the server can lock each employee to one
+// device. Generated once and kept in localStorage - a new install or a
+// cleared browser looks like a "new device" and needs admin approval again.
+function getDeviceId() {
+  let id = localStorage.getItem('bro_deviceid');
+  if (!id) {
+    id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ('dev-' + Date.now() + '-' + Math.random().toString(16).slice(2));
+    localStorage.setItem('bro_deviceid', id);
+  }
+  return id;
+}
+
 // Every backend call goes through here. empId (the caller's own ID, for the
-// server's role check) is attached automatically once curUser is set.
+// server's role check) and deviceId (for the device lock) are attached
+// automatically once curUser is set.
 function callBackend(action, params) {
-  const payload = Object.assign({ action: action, empId: curUser ? curUser.empId : undefined }, params || {});
+  const payload = Object.assign({ action: action, empId: curUser ? curUser.empId : undefined, deviceId: getDeviceId() }, params || {});
   return fetch(APPS_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -527,6 +549,34 @@ async function subEnroll(btn) {
     if (res.success) { showModal('Success', 'Registered ID: ' + res.data); f.reset(); showHome(); }
     else showModal('Error', res.message);
   }).catch(err => { btn.disabled = false; btn.innerText = 'Register'; showModal('Error', 'Could not reach server: ' + err.message); });
+}
+
+/* ---------- SUPERADMIN: MANAGE DEVICES ---------- */
+
+function loadDeviceManager() {
+  showView('view-devices');
+  const list = document.getElementById('device-list');
+  list.innerHTML = 'Loading...';
+  callBackend('getDeviceBindings', {}).then(res => {
+    if (!res.success) { list.innerHTML = ''; return showModal('Error', res.message); }
+    list.innerHTML = res.data.map(e => `
+      <div class="card p-2 mb-2 d-flex flex-row justify-content-between align-items-center">
+        <div>
+          <strong>${e.name}</strong> <span class="text-muted small">(${e.id})</span><br>
+          <span class="small ${e.bound ? 'text-success' : 'text-muted'}">${e.bound ? 'Device linked since ' + e.boundAt : 'No device linked yet'}</span>
+        </div>
+        <button class="btn btn-sm btn-outline-danger" ${e.bound ? '' : 'disabled'} onclick="resetDevice('${e.id}', this)">Reset</button>
+      </div>`).join('');
+  }).catch(err => { list.innerHTML = ''; showModal('Error', 'Could not reach server: ' + err.message); });
+}
+
+function resetDevice(eid, btn) {
+  if (!confirm(`Unlink the approved device for ${eid}? They'll be able to log in from a new device next.`)) return;
+  btn.disabled = true; btn.innerText = '...';
+  callBackend('resetDevice', { targetEmpId: eid }).then(res => {
+    showModal(res.success ? 'Success' : 'Error', res.message);
+    loadDeviceManager();
+  }).catch(err => { btn.disabled = false; btn.innerText = 'Reset'; showModal('Error', 'Could not reach server: ' + err.message); });
 }
 
 /* ---------- SUPERADMIN: MANAGE STATUS ---------- */
