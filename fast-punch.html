@@ -55,11 +55,12 @@
       <div class="col-6"><button class="btn btn-outline-primary w-100 btn-tile" onclick="showView('view-punch')"><span>📷</span> Punch</button></div>
       <div class="col-6"><button class="btn btn-outline-warning w-100 btn-tile" onclick="showView('view-leave')"><span>📅</span> Leave</button></div>
       <div class="col-12"><button class="btn btn-light w-100 py-3 border" onclick="loadCalendar()">📜 Monthly Calendar</button></div>
-      <div class="col-12 hidden" id="admin-panel">
+<div class="col-12 hidden" id="admin-panel">
         <hr><h6 class="text-muted text-center">Admin Controls</h6>
         <button class="btn btn-success w-100 mb-2" onclick="loadApprovals()">✅ Approve Leaves</button>
         <button class="btn btn-secondary w-100 mb-2" onclick="loadManualPunch()">🛠️ Manual Punch</button>
         <button class="btn btn-dark w-100 mb-2 hidden" id="enroll-btn" onclick="showView('view-enroll')">➕ Enroll Employee</button>
+        <button class="btn btn-info w-100 mb-2 hidden text-white" id="skill-matrix-btn" onclick="loadSkillMatrix()">📊 Skill Matrix</button>
       </div>
       <div class="col-12 hidden" id="super-panel">
         <button class="btn btn-primary w-100 mb-2" onclick="showView('view-manage-loc')">📍 Manage Locations</button>
