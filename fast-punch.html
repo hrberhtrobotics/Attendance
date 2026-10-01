@@ -776,6 +776,94 @@ function genReport(btn) {
     btn.disabled = false; btn.innerText = '📊 PDF Report';
   }).catch(err => { btn.disabled = false; btn.innerText = '📊 PDF Report'; showModal('Error', 'Could not reach server: ' + err.message); });
 }
+
+/* ---------- SKILL MATRIX ---------- */
+function loadSkillMatrix() {
+  showView('view-skill-matrix');
+}
+
+function fetchSkillMatrix() {
+  const dept = document.getElementById('matrix-dept-select').value;
+  const tbody = document.getElementById('sm-body');
+  const thead = document.getElementById('sm-head');
+  
+  if (!dept) {
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
+    return;
+  }
+  
+  tbody.innerHTML = '<tr><td colspan="100%">Loading data...</td></tr>';
+  
+  callBackend('getSkillMatrix', { targetDept: dept }).then(res => {
+    if (!res.success) {
+      tbody.innerHTML = ''; 
+      return showModal('Error', res.message);
+    }
+    const data = res.data;
+    if (!data.employees.length || !data.skills.length) {
+      thead.innerHTML = '';
+      tbody.innerHTML = '<tr><td class="text-muted p-3">No active employees or skills found for this department.</td></tr>';
+      return;
+    }
+
+    const ratingMap = {};
+    data.ratings.forEach(r => ratingMap[`${r.employee_id}_${r.skill_id}`] = r.rating);
+
+    let headHtml = '<tr><th style="min-width:140px; position:sticky; left:0; background:#212529; z-index:3;">Employee</th>';
+    data.skills.forEach(s => headHtml += `<th style="min-width:110px;">${s.skill_name}</th>`);
+    headHtml += '</tr>';
+    thead.innerHTML = headHtml;
+
+    let bodyHtml = '';
+    data.employees.forEach(emp => {
+      bodyHtml += `<tr><td class="fw-bold bg-light text-start" style="position:sticky; left:0; z-index:1;">${emp.name}<br><small class="text-muted">${emp.id}</small></td>`;
+      
+      data.skills.forEach(skill => {
+        const key = `${emp.id}_${skill.skill_id}`;
+        const currentRating = ratingMap[key] !== undefined ? ratingMap[key] : '';
+        
+        bodyHtml += `<td>
+          <select class="form-select form-select-sm" style="min-width:60px;" 
+                  onchange="updateSkill(this, '${emp.id}', ${skill.skill_id})">
+            <option value="" ${currentRating===''?'selected':''}>-</option>
+            <option value="0" ${currentRating===0?'selected':''}>0</option>
+            <option value="1" ${currentRating===1?'selected':''}>1</option>
+            <option value="2" ${currentRating===2?'selected':''}>2</option>
+            <option value="3" ${currentRating===3?'selected':''}>3</option>
+            <option value="4" ${currentRating===4?'selected':''}>4</option>
+          </select>
+        </td>`;
+      });
+      bodyHtml += '</tr>';
+    });
+    tbody.innerHTML = bodyHtml;
+    
+  }).catch(err => {
+    tbody.innerHTML = '';
+    showModal('Error', 'Could not reach server: ' + err.message);
+  });
+}
+
+function updateSkill(selectElement, empId, skillId) {
+  const val = selectElement.value;
+  if (val === "") return; 
+  
+  selectElement.style.backgroundColor = "#fff3cd"; 
+  
+  callBackend('updateSkillRating', { targetEmpId: empId, skillId: skillId, rating: val }).then(res => {
+    if (res.success) {
+      selectElement.style.backgroundColor = "#d1e7dd"; 
+      setTimeout(() => selectElement.style.backgroundColor = "", 1000);
+    } else {
+      selectElement.style.backgroundColor = "#f8d7da"; 
+      showModal('Error', res.message);
+    }
+  }).catch(err => {
+    selectElement.style.backgroundColor = "#f8d7da";
+    showModal('Error', 'Could not reach server: ' + err.message);
+  });
+}
 </script>
 </body>
 </html>
