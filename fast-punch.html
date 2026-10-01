@@ -248,10 +248,36 @@
     <button class="btn btn-link w-100 mt-3" onclick="showHome()">Back</button>
   </div>
 
-  <canvas id="canvas" style="display:none;"></canvas>
+<canvas id="canvas" style="display:none;"></canvas>
+
+  <!-- SKILL MATRIX VIEW -->
+  <div id="view-skill-matrix" class="hidden">
+    <h5 class="text-center mb-3">Resource Skill Matrix</h5>
+    <div class="input-group mb-3">
+      <select id="matrix-dept-select" class="form-select" onchange="fetchSkillMatrix()">
+        <option value="">Select Department...</option>
+        <option>Robotics</option><option>Controls</option><option>Design</option>
+        <option>Integration</option><option>Quality</option><option>SCM</option>
+        <option>Simulation</option><option>Projects</option><option>Sales</option>
+      </select>
+    </div>
+    
+    <div class="table-responsive bg-white border rounded mb-3" style="max-height: 450px; overflow: auto;">
+      <table class="table table-bordered table-sm text-center mb-0" style="font-size: 0.8rem;">
+        <thead id="sm-head" class="table-dark" style="position: sticky; top: 0; z-index: 2;"></thead>
+        <tbody id="sm-body"></tbody>
+      </table>
+    </div>
+    <div class="small text-muted text-center mb-3">
+      0=No Exposure | 1=Basic | 2=Working Knowledge | 3=Independent | 4=Expert
+    </div>
+    <button class="btn btn-link w-100" onclick="showHome()">Back</button>
+  </div>
+
 </div>
 
 <div id="custom-modal"><div class="modal-box"><h5 id="modal-title">Title</h5><p id="modal-msg" style="white-space:pre-line;">Message</p><button class="btn btn-primary w-100 mt-2" onclick="document.getElementById('custom-modal').style.display='none'">OK</button></div></div>
+  
 <div id="detail-modal" onclick="this.style.display='none'"><div class="modal-box" onclick="event.stopPropagation()"><p id="mod-content"></p><button class="btn btn-sm btn-secondary" onclick="document.getElementById('detail-modal').style.display='none'">Close</button></div></div>
 
 <script>
@@ -338,9 +364,10 @@ function enterDashboard(res) {
   document.getElementById('enroll-btn').classList.add('hidden');
   if (res.role === 'Admin' || res.role === 'SuperAdmin') document.getElementById('admin-panel').classList.remove('hidden');
   if (res.role === 'SuperAdmin') { document.getElementById('super-panel').classList.remove('hidden'); populateReportDropdown(); }
-  // Enroll Employee: only SuperAdmin, or an Admin whose own department is "Admin" (HR/Admin function).
+// Enroll Employee: only SuperAdmin, or an Admin whose own department is "Admin" (HR/Admin function).
   if (res.role === 'SuperAdmin' || (res.role === 'Admin' && res.dept === 'Admin')) {
     document.getElementById('enroll-btn').classList.remove('hidden');
+    document.getElementById('skill-matrix-btn').classList.remove('hidden');
   }
 
   document.getElementById('btn-in').disabled = !!res.hasIn;
